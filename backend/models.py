@@ -89,6 +89,11 @@ class JournalEntry(BaseModel):
     entry_date: date
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # Mood Ring fields
+    sentiment: Optional[str] = None
+    themes: Optional[List[str]] = None
+    ai_summary: Optional[str] = None
+    analyzed_at: Optional[datetime] = None
 
 
 class StreakInfo(BaseModel):

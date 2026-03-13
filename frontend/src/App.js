@@ -10,6 +10,7 @@ import { Habits } from '@/pages/Habits';
 import { Journal } from '@/pages/Journal';
 import { Stats } from '@/pages/Stats';
 import { AIAssistant } from '@/pages/AIAssistant';
+import { EmotionalDashboard } from '@/pages/EmotionalDashboard';
 import { Friends } from '@/pages/Friends';
 import { Settings } from '@/pages/Settings';
 import { Toaster } from '@/components/ui/sonner';
@@ -27,6 +28,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/habits" element={<Habits />} />
             <Route path="/journal" element={<Journal />} />
+            <Route path="/insights" element={<EmotionalDashboard />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/ai-assistant" element={<AIAssistant />} />

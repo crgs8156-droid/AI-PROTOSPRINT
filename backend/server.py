@@ -447,11 +447,34 @@ async def create_journal_entry(entry_data: JournalEntryCreate, user_id: str = De
         # Store a copy before inserting to avoid ObjectId in response
         response_data = entry_dict.copy()
         await journal_collection.insert_one(entry_dict)
+        
+        # Auto-trigger AI analysis in background (Mood Ring feature)
+        import asyncio
+        asyncio.create_task(analyze_entry_background(entry_dict['id'], entry_data.content))
+        
         return {"success": True, "data": response_data}
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def analyze_entry_background(entry_id: str, content: str):
+    """Background task to analyze journal entry."""
+    try:
+        analysis = await ai_service.analyze_journal_entry(content)
+        await journal_collection.update_one(
+            {"id": entry_id},
+            {"$set": {
+                "sentiment": analysis["sentiment"],
+                "themes": analysis["themes"],
+                "ai_summary": analysis["summary"],
+                "analyzed_at": datetime.utcnow().isoformat()
+            }}
+        )
+        print(f"✅ Analysis complete for entry {entry_id}: {analysis['sentiment']}")
+    except Exception as e:
+        print(f"❌ Failed to analyze entry {entry_id}: {str(e)}")
 
 
 @api_router.put("/journal/{entry_id}")
@@ -634,6 +657,171 @@ async def ai_chat(request: AIRequest, user_id: str = Depends(get_current_user)):
         return AIResponse(success=True, data=result)
     except Exception as e:
         return AIResponse(success=False, error=str(e))
+
+
+
+# ============= MOOD RING (EMOTIONAL ANALYSIS) ROUTES =============
+
+@api_router.post("/ai/analyze-entry")
+async def analyze_journal_entry(request: AIRequest, user_id: str = Depends(get_current_user)):
+    """Analyze a journal entry for sentiment, themes, and summary."""
+    try:
+        import json
+        data = json.loads(request.prompt)
+        entry_id = data.get('entryId')
+        content = data.get('content')
+        
+        # Get the journal entry to verify ownership
+        entry = await journal_collection.find_one(
+            {"id": entry_id, "user_id": user_id},
+            {"_id": 0}
+        )
+        if not entry:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+        
+        # Run AI analysis
+        analysis = await ai_service.analyze_journal_entry(content)
+        
+        # Update entry with analysis
+        update_data = {
+            "sentiment": analysis["sentiment"],
+            "themes": analysis["themes"],
+            "ai_summary": analysis["summary"],
+            "analyzed_at": datetime.utcnow().isoformat()
+        }
+        
+        await journal_collection.update_one(
+            {"id": entry_id},
+            {"$set": update_data}
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "sentiment": analysis["sentiment"],
+                "themes": analysis["themes"],
+                "ai_summary": analysis["summary"]
+            }
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@api_router.post("/ai/analyze-batch")
+async def analyze_batch_entries(user_id: str = Depends(get_current_user)):
+    """Analyze all unanalyzed journal entries for the user."""
+    try:
+        # Get unanalyzed entries
+        unanalyzed = await journal_collection.find({
+            "user_id": user_id,
+            "analyzed_at": {"$exists": False}
+        }, {"_id": 0}).to_list(100)
+        
+        processed = 0
+        failed = 0
+        
+        for entry in unanalyzed:
+            try:
+                # Run analysis
+                analysis = await ai_service.analyze_journal_entry(entry['content'])
+                
+                # Update entry
+                await journal_collection.update_one(
+                    {"id": entry['id']},
+                    {"$set": {
+                        "sentiment": analysis["sentiment"],
+                        "themes": analysis["themes"],
+                        "ai_summary": analysis["summary"],
+                        "analyzed_at": datetime.utcnow().isoformat()
+                    }}
+                )
+                processed += 1
+                
+                # 500ms delay between calls as specified
+                import asyncio
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                print(f"Failed to analyze entry {entry['id']}: {str(e)}")
+                failed += 1
+        
+        return {
+            "success": True,
+            "data": {
+                "processed": processed,
+                "failed": failed,
+                "total": len(unanalyzed)
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@api_router.get("/ai/emotional-dashboard")
+async def get_emotional_dashboard(user_id: str = Depends(get_current_user)):
+    """Get emotional analysis data for the last 14 days."""
+    try:
+        # Get last 14 days entries
+        start_date = (date.today() - timedelta(days=13)).isoformat()
+        
+        entries = await journal_collection.find({
+            "user_id": user_id,
+            "entry_date": {"$gte": start_date}
+        }, {"_id": 0}).sort("entry_date", 1).to_list(100)
+        
+        # Filter to only include analyzed entries for the response
+        dashboard_data = []
+        for entry in entries:
+            dashboard_data.append({
+                "entry_date": entry.get("entry_date"),
+                "sentiment": entry.get("sentiment"),
+                "themes": entry.get("themes", []),
+                "ai_summary": entry.get("ai_summary"),
+                "mood": entry.get("mood"),
+                "analyzed_at": entry.get("analyzed_at")
+            })
+        
+        return {"success": True, "data": dashboard_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/ai/weekly-summary")
+async def generate_weekly_summary(user_id: str = Depends(get_current_user)):
+    """Generate AI summary of the week's emotional state."""
+    try:
+        # Get last 7 days entries
+        start_date = (date.today() - timedelta(days=6)).isoformat()
+        
+        entries = await journal_collection.find({
+            "user_id": user_id,
+            "entry_date": {"$gte": start_date},
+            "analyzed_at": {"$exists": True}
+        }, {"_id": 0, "entry_date": 1, "sentiment": 1, "themes": 1, "ai_summary": 1}).sort("entry_date", 1).to_list(7)
+        
+        if not entries:
+            return {
+                "success": True,
+                "data": {
+                    "summary": "No journal entries found for the past week. Start journaling to see your emotional insights!"
+                }
+            }
+        
+        # Generate weekly summary
+        summary = await ai_service.generate_weekly_summary(entries)
+        
+        return {
+            "success": True,
+            "data": {
+                "summary": summary,
+                "entries_count": len(entries),
+                "date_range": f"{entries[0]['entry_date']} to {entries[-1]['entry_date']}"
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 

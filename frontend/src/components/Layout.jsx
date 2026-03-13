@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, BookOpen, CheckCircle2, BarChart2, Sparkles, LogOut, Users, Settings as SettingsIcon } from 'lucide-react';
+import { Home, BookOpen, CheckCircle2, BarChart2, Sparkles, LogOut, Users, Settings as SettingsIcon, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const Layout = ({ children }) => {
@@ -17,6 +17,7 @@ export const Layout = ({ children }) => {
     { to: '/dashboard', icon: Home, label: 'Dashboard' },
     { to: '/habits', icon: CheckCircle2, label: 'Habits' },
     { to: '/journal', icon: BookOpen, label: 'Journal' },
+    { to: '/insights', icon: Brain, label: 'Insights' },
     { to: '/stats', icon: BarChart2, label: 'Stats' },
     { to: '/friends', icon: Users, label: 'Friends' },
     { to: '/ai-assistant', icon: Sparkles, label: 'AI Assistant' },

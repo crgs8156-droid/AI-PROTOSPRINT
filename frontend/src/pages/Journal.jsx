@@ -227,6 +227,16 @@ export const Journal = () => {
         <div className="space-y-6">
           {entries.map((entry, idx) => {
             const moodStyle = getMoodStyle(entry.mood);
+            const sentimentColors = {
+              'Positive': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-300',
+              'Excited': 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-300',
+              'Calm': 'bg-sky-100 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400 border-sky-300',
+              'Anxious': 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 border-orange-300',
+              'Overwhelmed': 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400 border-red-300',
+              'Lethargic': 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400 border-gray-300',
+              'Sad': 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-300',
+            };
+            
             return (
               <motion.div
                 key={entry.id}
@@ -236,13 +246,36 @@ export const Journal = () => {
               >
                 <Card className="p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all duration-300">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${moodStyle.color}`}>
-                        {moodStyle.emoji} {entry.mood}
-                      </span>
-                      <span className="text-sm text-slate-500 dark:text-slate-400">
-                        {entry.entry_date}
-                      </span>
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex items-center space-x-3">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${moodStyle.color}`}>
+                          {moodStyle.emoji} {entry.mood}
+                        </span>
+                        {entry.sentiment ? (
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium border ${sentimentColors[entry.sentiment] || sentimentColors['Calm']}`}>
+                            ✨ {entry.sentiment}
+                          </span>
+                        ) : entry.analyzed_at === undefined ? (
+                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            🔄 Analyzing...
+                          </span>
+                        ) : null}
+                        <span className="text-sm text-slate-500 dark:text-slate-400">
+                          {entry.entry_date}
+                        </span>
+                      </div>
+                      {entry.themes && entry.themes.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {entry.themes.map((theme, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-1 text-xs rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              {theme}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button
@@ -267,6 +300,16 @@ export const Journal = () => {
                   <p className="font-journal text-lg leading-loose text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
                     {entry.content}
                   </p>
+                  {entry.ai_summary && (
+                    <div className="mt-4 p-4 bg-violet-50 dark:bg-violet-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
+                      <p className="text-sm font-medium text-violet-900 dark:text-violet-300 mb-1">
+                        AI Insight:
+                      </p>
+                      <p className="text-sm text-violet-700 dark:text-violet-400">
+                        {entry.ai_summary}
+                      </p>
+                    </div>
+                  )}
                 </Card>
               </motion.div>
             );

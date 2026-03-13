@@ -103,6 +103,77 @@ Provide 2-3 sentences of encouraging insights and suggestions."""
             return response
         except Exception as e:
             return f"Error in chat: {str(e)}"
+    
+    async def analyze_journal_entry(self, content: str) -> dict:
+        """Analyze journal entry for sentiment, themes, and summary (Mood Ring feature)."""
+        try:
+            prompt = f"""Analyze this journal entry and respond ONLY in valid JSON format with no markdown formatting or code blocks:
+{{
+  "sentiment": "one word emotion from: Positive/Anxious/Lethargic/Excited/Sad/Calm/Overwhelmed",
+  "themes": ["2-4 key life themes mentioned like Work Stress, Family, Good Sleep"],
+  "summary": "one paragraph about the writer's mental state"
+}}
+
+Journal entry: {content}"""
+            
+            chat = LlmChat(
+                api_key=self.api_key,
+                session_id="journal_analysis",
+                system_message="You are an emotional intelligence analyst. Respond ONLY with valid JSON, no markdown."
+            ).with_model("anthropic", "claude-sonnet-4-6")
+            
+            message = UserMessage(text=prompt)
+            response = await chat.send_message(message)
+            
+            # Parse JSON response
+            import json
+            # Remove any markdown formatting if present
+            clean_response = response.strip()
+            if clean_response.startswith("```"):
+                clean_response = clean_response.split("```")[1]
+                if clean_response.startswith("json"):
+                    clean_response = clean_response[4:]
+            clean_response = clean_response.strip()
+            
+            analysis = json.loads(clean_response)
+            return {
+                "sentiment": analysis.get("sentiment", "Neutral"),
+                "themes": analysis.get("themes", []),
+                "summary": analysis.get("summary", "")
+            }
+        except Exception as e:
+            print(f"Error analyzing journal entry: {str(e)}")
+            return {
+                "sentiment": "Neutral",
+                "themes": [],
+                "summary": "Analysis unavailable"
+            }
+    
+    async def generate_weekly_summary(self, entries: list) -> str:
+        """Generate weekly emotional summary from multiple entries."""
+        try:
+            entries_text = "\n\n".join([
+                f"Day {i+1} ({entry['entry_date']}): Sentiment: {entry.get('sentiment', 'Unknown')}, Themes: {', '.join(entry.get('themes', []))}"
+                for i, entry in enumerate(entries)
+            ])
+            
+            prompt = f"""Based on these journal entries from the past week, write a compassionate one-paragraph summary of the person's emotional week. Focus on patterns, growth, and overall mental state.
+
+{entries_text}
+
+Provide an encouraging, insightful summary:"""
+            
+            chat = LlmChat(
+                api_key=self.api_key,
+                session_id="weekly_summary",
+                system_message="You are a compassionate emotional wellness coach."
+            ).with_model("anthropic", "claude-sonnet-4-6")
+            
+            message = UserMessage(text=prompt)
+            response = await chat.send_message(message)
+            return response
+        except Exception as e:
+            return "Unable to generate weekly summary at this time."
 
 
 ai_service = AIService()
